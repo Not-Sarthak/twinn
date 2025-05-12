@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String       @id 
+  profileImage           String?     
+  email                  String?      @unique
+  name                   String
+  walletAddress          String       @unique
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  creditBalance          Int          @default(0)
+  creditTransactions     CreditTransaction[] @relation("UserCreditTransactions")
+  
+  mintedDrops            MintedDrop[] @relation("UserMintedDrops")
+  moments                Moment[]     @relation("UserMoments")
+  collections            Collection[] @relation("UserCollections")
+  drops                  Drop[]       @relation("UserDrops")
+}
+
+model CreditTransaction {
+  id                     String       @id @default(uuid())
+  amount                 Int          
+  transactionHash        String?      
+  cost                   Float?       
+  description            String       
+  createdAt              DateTime     @default(now())
+  
+  // Relations
+  user                   User         @relation("UserCreditTransactions", fields: [userId], references: [id])
+  userId                 String
+  drop                   Drop?        @relation("DropCreditTransactions", fields: [dropId], references: [id])
+  dropId                 String?      
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Collection {
+  id                     String       @id @default(uuid())
+  logo                   String?      
+  coverImage             String?      
+  name                   String
+  title                  String?
+  description            String?
+  link                   String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  
+  creator                User         @relation("UserCollections", fields: [creatorId], references: [id])
+  creatorId              String
+  drops                  Drop[]       @relation("CollectionDrops")
+}
+
+model Drop {
+  id                     String       @id @default(uuid())
+  image                  String       
+  name                   String
+  description            String?
+  website                String?
+  location               String?
+  startDate              DateTime
+  endDate                DateTime
+  maxSupply              Int
+  creditsAllocated       Int          @default(0)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  
+  creator                User         @relation("UserDrops", fields: [creatorId], references: [id])
+  creatorId              String
+  collection             Collection   @relation("CollectionDrops", fields: [collectionId], references: [id])
+  collectionId           String
+  mintedDrops            MintedDrop[] @relation("DropMintedInstances")
+  moments                Moment[]     @relation("DropMoments")
+  creditTransactions     CreditTransaction[] @relation("DropCreditTransactions")
+
+  @@index([creatorId])
+}
+
+model MintedDrop {
+  id                     String       @id @default(uuid())
+  mintedAtNumber         Int
+  transactionHash        String?    
+  mintedAt               DateTime     @default(now())
+  
+  minter                 User         @relation("UserMintedDrops", fields: [minterId], references: [id])
+  minterId               String
+  drop                   Drop         @relation("DropMintedInstances", fields: [dropId], references: [id])
+  dropId                 String
+  moments                Moment[]     @relation("MintedDropMoments")
+
+  @@unique([dropId, mintedAtNumber])
+}
+
+model Moment {
+  id                     String       @id @default(uuid())
+  image                  String      
+  caption                String?     
+  imageType              String?      
+  imageSize              Int?         
+  imageFormat            String?      
+  imageDimensions        String?      
+  locationTaken          String?    
+  
+  creator                User         @relation("UserMoments", fields: [creatorId], references: [id])
+  creatorId              String      
+  mintedDrop             MintedDrop   @relation("MintedDropMoments", fields: [mintedDropId], references: [id])
+  mintedDropId           String       
+  drop                   Drop         @relation("DropMoments", fields: [dropId], references: [id])
+  dropId                 String       
+  
+  createdAt              DateTime     @default(now())
+  
+  @@index([creatorId])
+  @@index([dropId])
+  @@index([mintedDropId])
+}
