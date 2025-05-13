@@ -59,7 +59,7 @@ export default function CreateDropPage() {
       attendees: formData.attendees || 0,
       ipfsHash: formData.ipfsHash || "",
       symbol: formData.symbol || "",
-      createNFT: true, // Always create NFT
+      createNFT: true,
       recipientAddress: walletAddress || "",
     },
   });
@@ -137,6 +137,7 @@ export default function CreateDropPage() {
 
     try {
       setIsCreatingNFT(true);
+      console.log("Creating NFT...");
 
       const nftData = {
         name: data.title,
@@ -467,7 +468,7 @@ export default function CreateDropPage() {
             <div className="flex items-center justify-center">
               <Button
                 type="submit"
-                className="mt-8 flex w-64 items-center justify-center bg-black font-garamond text-lg italic text-white hover:bg-black/80"
+                className="mt-8 z-50 flex w-64 items-center justify-center bg-black font-garamond text-lg italic text-white hover:bg-black/80"
                 disabled={isUploading || isCreatingNFT}
               >
                 {isCreatingNFT ? (
