@@ -10,7 +10,7 @@ import { registerUserRoutes } from '../routes/user.routes';
 import { registerCollectionRoutes } from '../routes/collection.routes';
 import { registerDropRoutes } from '../routes/drop.routes';
 import { registerMomentRoutes } from '../routes/moment.routes';
-import { registerCompressedNFTRoutes } from '../routes/compressed-nft.routes';
+import { registerCreditRoutes } from '../routes/credit.routes';
 
 export const buildServer = (): FastifyInstance => {
   const server = fastify({
@@ -85,7 +85,7 @@ export const buildServer = (): FastifyInstance => {
   registerCollectionRoutes(server, '/api/collections');
   registerDropRoutes(server, '/api/drops');
   registerMomentRoutes(server, '/api/moments');
-  registerCompressedNFTRoutes(server, '/api/compressed-nft');
+  registerCreditRoutes(server, '/api/credits');
 
   server.get('/health', async () => {
     return { status: 'OK' };

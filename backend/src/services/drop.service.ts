@@ -1,6 +1,8 @@
 import { db } from '../config/db';
 import { IDropCreate, IDropResponse, IMintedDropCreate } from '../types';
 import { getPagination } from '../utils/pagination';
+import { createCompressedNFT, CompressedNFTResult } from './compressed-nft.service';
+import { CREDITS_PER_MINT } from '../utils/constants';
 
 /**
  * Helper function to transform nullable fields to undefined for type safety
@@ -11,6 +13,12 @@ function sanitizeDrop(drop: any) {
     description: drop.description || undefined,
     website: drop.website || undefined,
     location: drop.location || undefined,
+    artistInfo: drop.artistInfo || undefined,
+    externalLink: drop.externalLink || undefined,
+    power: drop.power || undefined,
+    mintAddress: drop.mintAddress || undefined,
+    metadataUri: drop.metadataUri || undefined,
+    uniqueCode: drop.uniqueCode || undefined,
   };
 }
 
@@ -30,12 +38,63 @@ export async function createDrop(data: IDropCreate, creatorId: string) {
     throw new Error('Collection not found or you do not have permission to add drops to it');
   }
 
-  return db.drop.create({
+  // Get user wallet address for NFT recipient
+  const user = await db.user.findUnique({
+    where: { id: creatorId },
+    select: { walletAddress: true }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Create the drop in the database
+  const drop = await db.drop.create({
     data: {
       ...data,
       creatorId,
+      isFeatured: data.isFeatured || false,
+      artistInfo: data.artistInfo,
+      externalLink: data.externalLink,
+      power: data.power,
     },
   });
+
+  // Create compressed NFT
+  let nftData: CompressedNFTResult | null = null;
+  try {
+    nftData = await createCompressedNFT({
+      name: data.name,
+      symbol: collection.name.substring(0, 5).toUpperCase(), // Generate symbol from collection name
+      description: data.description || `Drop from ${collection.name}`,
+      supply: data.maxSupply,
+      recipientAddress: user.walletAddress,
+      image: data.image
+    });
+
+    // Update the drop with NFT information
+    await db.drop.update({
+      where: { id: drop.id },
+      data: {
+        mintAddress: nftData.mintAddress,
+        metadataUri: nftData.metadataUri,
+        uniqueCode: nftData.uniqueCode
+      }
+    });
+
+    // Return updated drop with NFT data
+    return {
+      ...drop,
+      mintAddress: nftData.mintAddress,
+      metadataUri: nftData.metadataUri,
+      uniqueCode: nftData.uniqueCode,
+      nftData
+    };
+  } catch (error) {
+    console.error('Error creating compressed NFT:', error);
+    // Still return the drop even if NFT creation failed
+    return drop;
+  }
 }
 
 /**
@@ -232,45 +291,82 @@ export async function mintDrop(data: IMintedDropCreate, userId: string) {
     throw new Error('This drop has reached its maximum supply');
   }
 
+  // Check if user has enough credits (1 credit per mint)
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, creditBalance: true }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.creditBalance < CREDITS_PER_MINT) {
+    throw new Error(`You need at least ${CREDITS_PER_MINT} credit to mint this drop. Please purchase more credits.`);
+  }
+
   // Get the next mint number
   const mintedAtNumber = mintCount + 1;
 
-  // Create the minted drop instance
-  const mintedDrop = await db.mintedDrop.create({
-    data: {
-      mintedAtNumber,
-      transactionHash: data.transactionHash,
-      dropId: data.dropId,
-      minterId: userId,
-    },
-    include: {
-      drop: {
-        select: {
-          id: true,
-          name: true,
-          image: true,
-          collection: {
-            select: {
-              id: true,
-              name: true,
+  // Create transaction in a database transaction to ensure atomicity
+  return db.$transaction(async (tx) => {
+    // Deduct credits from user
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        creditBalance: {
+          decrement: CREDITS_PER_MINT
+        }
+      }
+    });
+
+    // Record credit transaction
+    await tx.creditTransaction.create({
+      data: {
+        amount: -CREDITS_PER_MINT,
+        description: `Used ${CREDITS_PER_MINT} credit to mint drop "${drop.name}"`,
+        userId,
+        dropId: drop.id
+      }
+    });
+
+    // Create the minted drop instance
+    const mintedDrop = await tx.mintedDrop.create({
+      data: {
+        mintedAtNumber,
+        transactionHash: data.transactionHash,
+        dropId: data.dropId,
+        minterId: userId,
+      },
+      include: {
+        drop: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            collection: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
-      },
-      minter: {
-        select: {
-          id: true,
-          name: true,
-          walletAddress: true,
+        minter: {
+          select: {
+            id: true,
+            name: true,
+            walletAddress: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  return {
-    ...(mintedDrop as any),
-    collection: (mintedDrop as any).drop.collection,
-  };
+    return {
+      ...(mintedDrop as any),
+      collection: (mintedDrop as any).drop.collection,
+    };
+  });
 }
 
 /**

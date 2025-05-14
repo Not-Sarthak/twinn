@@ -106,12 +106,6 @@ export async function updateUser(id: string, data: Partial<IUserCreate>) {
   });
 }
 
-export async function deleteUser(id: string) {
-  return db.user.delete({
-    where: { id },
-  });
-}
-
 export async function getUserCollections(userId: string, page = 1, limit = 10) {
   const pagination = getPagination({ page, limit });
   

@@ -1,8 +1,8 @@
 // User types
 export interface IUser {
-  id: string; // privyDID from Privy
+  id: string;
   profileImage?: string | null;
-  email?: string; // Optional with Privy
+  email?: string;
   name: string;
   walletAddress: string;
   createdAt: Date;
@@ -10,14 +10,13 @@ export interface IUser {
 }
 
 export interface IUserCreate {
-  id: string; // privyDID from Privy
+  id: string;
   profileImage?: string;
-  email?: string; // Optional with Privy
+  email?: string;
   name: string;
   walletAddress: string;
 }
 
-// New Privy authentication type
 export interface IPrivyAuth {
   privyDID: string;
   email?: string;
@@ -32,7 +31,6 @@ export interface IUserResponse extends IUser {
   numberOfMintedDrops: number;
 }
 
-// For backward compatibility
 export interface IUserWithLinkedWallet extends Omit<IUser, 'walletAddress'> {
   linkedWallet: string;
 }
@@ -49,6 +47,8 @@ export interface ICollection {
   creatorId: string;
   createdAt: Date;
   updatedAt: Date;
+  isVerified: boolean;
+  type?: string;
 }
 
 export interface ICollectionCreate {
@@ -58,6 +58,8 @@ export interface ICollectionCreate {
   title?: string;
   description?: string;
   link?: string;
+  isVerified?: boolean;
+  type?: string;
 }
 
 export interface ICollectionResponse extends ICollection {
@@ -85,10 +87,18 @@ export interface IDrop {
   collectionId: string;
   createdAt: Date;
   updatedAt: Date;
+  isFeatured: boolean;
+  artistInfo?: string;
+  externalLink?: string;
+  power?: number;
+  creditsAllocated: number;
+  mintAddress?: string;
+  metadataUri?: string;
+  uniqueCode?: string;
 }
 
 export interface IDropCreate {
-  image: string; // IPFS hash
+  image: string;
   name: string;
   description?: string;
   website?: string;
@@ -97,6 +107,10 @@ export interface IDropCreate {
   endDate: Date;
   maxSupply: number;
   collectionId: string;
+  isFeatured?: boolean;
+  artistInfo?: string;
+  externalLink?: string;
+  power?: number;
 }
 
 export interface IDropResponse extends IDrop {
@@ -112,9 +126,9 @@ export interface IDropResponse extends IDrop {
   numberOfTransfers: number;
   numberOfCollectors: number;
   numberOfMoments: number;
+  nftData?: any;
 }
 
-// Minted Drop types (previously NFT)
 export interface IMintedDrop {
   id: string;
   mintedAtNumber: number;
@@ -150,28 +164,30 @@ export interface IMintedDropResponse extends IMintedDrop {
 export interface IMoment {
   id: string;
   image: string;
+  caption?: string;
   imageType?: string;
   imageSize?: number;
   imageFormat?: string;
   imageDimensions?: string;
+  locationTaken?: string;
+  likeCount: number;
   createdAt: Date;
   creatorId: string;
-  collectionId?: string;
-  dropId?: string;
-  mintedDropId?: string;
+  mintedDropId: string;
+  dropId: string;
 }
 
 export interface IMomentCreate {
-  image: string; // IPFS hash
+  image: string;
+  caption?: string;
   imageType?: string;
   imageSize?: number;
   imageFormat?: string;
   imageDimensions?: string;
-  caption?: string;
   locationTaken?: string;
-  collectionId?: string;
-  dropId?: string;
-  mintedDropId?: string;
+  likeCount?: number;
+  dropId: string;
+  mintedDropId: string;
 }
 
 export interface IMomentResponse extends IMoment {
@@ -182,7 +198,6 @@ export interface IMomentResponse extends IMoment {
   };
 }
 
-// Family (mutual drops) types
 export interface IFamilyConnection {
   id: string;
   user1: string;
@@ -217,7 +232,6 @@ export interface IMomentQuery extends IPaginationQuery {
   mintedDropId?: string;
 }
 
-// For backward compatibility
 export type INFT = IMintedDrop;
 export type INFTCreate = IMintedDropCreate;
 export type INFTResponse = IMintedDropResponse;
@@ -227,3 +241,14 @@ export interface IFamilyQuery {
   userAddress: string;
   otherUserAddress?: string;
 } 
+
+export interface PrivyUser {
+  id: string;       
+  email?: string;   
+  wallet: string;   
+}
+
+export interface CreditPurchaseData {
+  amount: number;
+  transactionHash: string;
+}

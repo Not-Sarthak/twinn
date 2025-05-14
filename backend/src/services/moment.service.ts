@@ -41,6 +41,7 @@ export const momentService = {
         imageDimensions: data.imageDimensions,
         caption: data.caption,
         locationTaken: data.locationTaken,
+        likeCount: data.likeCount || 0,
         creatorId,
         dropId: data.dropId!,
         mintedDropId: data.mintedDropId!,
@@ -150,29 +151,41 @@ export const momentService = {
     };
   },
 
-  async updateMoment(id: string, data: Partial<IMomentCreate>, userId: string) {
-    // Check if the moment exists and belongs to the user
-    const moment = await db.moment.findFirst({
-      where: {
-        id,
-        creatorId: userId,
-      },
-    });
+  async updateMoment(id: string, data: Partial<IMomentCreate>, userId?: string) {
+    // If userId is provided, check if the moment exists and belongs to the user
+    if (userId) {
+      const moment = await db.moment.findFirst({
+        where: {
+          id,
+          creatorId: userId,
+        },
+      });
 
-    if (!moment) {
-      throw new Error('Moment not found or you do not have permission to update it');
+      if (!moment) {
+        throw new Error('Moment not found or you do not have permission to update it');
+      }
+    } else {
+      // Just check if the moment exists
+      const moment = await db.moment.findUnique({
+        where: { id },
+      });
+      
+      if (!moment) {
+        throw new Error('Moment not found');
+      }
     }
 
     // Only allow updating certain fields, not the relationships
-    const updateData = {
-      image: data.image,
-      caption: data.caption,
-      imageType: data.imageType,
-      imageSize: data.imageSize,
-      imageFormat: data.imageFormat,
-      imageDimensions: data.imageDimensions,
-      locationTaken: data.locationTaken,
-    };
+    const updateData: any = {};
+    
+    if (data.image !== undefined) updateData.image = data.image;
+    if (data.caption !== undefined) updateData.caption = data.caption;
+    if (data.imageType !== undefined) updateData.imageType = data.imageType;
+    if (data.imageSize !== undefined) updateData.imageSize = data.imageSize;
+    if (data.imageFormat !== undefined) updateData.imageFormat = data.imageFormat;
+    if (data.imageDimensions !== undefined) updateData.imageDimensions = data.imageDimensions;
+    if (data.locationTaken !== undefined) updateData.locationTaken = data.locationTaken;
+    if (data.likeCount !== undefined) updateData.likeCount = data.likeCount;
 
     return db.moment.update({
       where: { id },
@@ -219,4 +232,44 @@ export const momentService = {
       where: { id },
     });
   },
+  
+  async likeMoment(id: string) {
+    // First, get the current moment to get the like count
+    const moment = await db.moment.findUnique({
+      where: { id },
+      select: { likeCount: true }
+    });
+    
+    if (!moment) {
+      throw new Error('Moment not found');
+    }
+    
+    // Increment the like count
+    return db.moment.update({
+      where: { id },
+      data: { likeCount: moment.likeCount + 1 },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            walletAddress: true,
+          },
+        },
+        drop: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+        mintedDrop: {
+          select: {
+            id: true,
+            mintedAtNumber: true,
+          },
+        },
+      },
+    });
+  }
 }; 

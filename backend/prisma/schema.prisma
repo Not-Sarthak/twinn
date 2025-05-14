@@ -54,10 +54,14 @@ model Collection {
   link                   String?
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
+  isVerified             Boolean      @default(false)
+  type                   String?      // Organization, Individual, etc.
   
   creator                User         @relation("UserCollections", fields: [creatorId], references: [id])
   creatorId              String
   drops                  Drop[]       @relation("CollectionDrops")
+  
+  @@index([creatorId])
 }
 
 model Drop {
@@ -73,6 +77,13 @@ model Drop {
   creditsAllocated       Int          @default(0)
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
+  isFeatured             Boolean      @default(false)
+  artistInfo             String?      // Added artist information
+  externalLink           String?      // Added external link
+  power                  Int?         // Added power field
+  mintAddress            String?      // NFT mint address
+  metadataUri            String?      // NFT metadata URI
+  uniqueCode             String?      // NFT unique code
   
   creator                User         @relation("UserDrops", fields: [creatorId], references: [id])
   creatorId              String
@@ -83,6 +94,7 @@ model Drop {
   creditTransactions     CreditTransaction[] @relation("DropCreditTransactions")
 
   @@index([creatorId])
+  @@index([collectionId])
 }
 
 model MintedDrop {
@@ -98,6 +110,8 @@ model MintedDrop {
   moments                Moment[]     @relation("MintedDropMoments")
 
   @@unique([dropId, mintedAtNumber])
+  @@index([minterId])
+  @@index([dropId])
 }
 
 model Moment {
@@ -109,6 +123,7 @@ model Moment {
   imageFormat            String?      
   imageDimensions        String?      
   locationTaken          String?    
+  likeCount              Int          @default(0)
   
   creator                User         @relation("UserMoments", fields: [creatorId], references: [id])
   creatorId              String      

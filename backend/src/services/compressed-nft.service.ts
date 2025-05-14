@@ -34,13 +34,12 @@ import crypto from 'crypto';
 
 dotenv.config();
 
-// Use RPC_URL environment variable, but make sure we're on devnet
 const RPC_ENDPOINT = process.env.RPC_URL || clusterApiUrl("devnet");
-console.log('Using RPC endpoint:', RPC_ENDPOINT);
+console.log('Using RPC Endpoint:', RPC_ENDPOINT);
 
 const connection = createRpc(RPC_ENDPOINT);
 
-// Get payer from environment or generate a new one
+// Get Payer from Environment or Generate a New One
 const getPayer = () => {
   const keypair = process.env.PAYER_KEYPAIR 
     ? Keypair.fromSecretKey(bs58.decode(process.env.PAYER_KEYPAIR))
@@ -50,7 +49,7 @@ const getPayer = () => {
   return keypair;
 };
 
-// Generate a unique 6-character alphanumeric code
+// Generate a Unique 6-Character Alphanumeric Code
 export const generateUniqueCode = (): string => {
   return crypto.randomBytes(3).toString('hex').toUpperCase();
 };
@@ -86,11 +85,11 @@ export const createCompressedNFT = async (params: CreateCompressedNFTParams): Pr
     console.log('Payer public key:', payer.publicKey.toString());
     
     // Verify that we're on the right network
-    console.log('Verifying network...');
+    console.log('Verifying Network...');
     try {
       const genesisHash = await connection.getGenesisHash();
-      console.log('Current network genesis hash:', genesisHash);
-      // Devnet genesis hash
+      console.log('Current Network Genesis Hash:', genesisHash);
+      // Devnet Genesis Hash
       const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
       
       if (process.env.RPC_URL && !process.env.RPC_URL.includes("devnet") && genesisHash !== DEVNET_GENESIS) {
@@ -303,7 +302,7 @@ export const createCompressedNFT = async (params: CreateCompressedNFTParams): Pr
       
       // Transfer to recipient if different from payer
       let transferTxId;
-      const transferAmount = Math.floor(totalMintAmount / 2); // Transfer half of supply as example
+      const transferAmount = totalMintAmount; // Transfer ALL tokens to recipient instead of half
       
       if (!payer.publicKey.equals(recipientPubkey)) {
         console.log(`Transferring ${transferAmount} tokens to recipient...`);

@@ -13,6 +13,7 @@ function sanitizeCollection(collection: any) {
     title: collection.title || undefined,
     description: collection.description || undefined,
     link: collection.link || undefined,
+    type: collection.type || undefined,
   };
 }
 
@@ -24,6 +25,8 @@ export async function createCollection(data: ICollectionCreate, creatorId: strin
     data: {
       ...data,
       creatorId,
+      isVerified: data.isVerified || false,
+      type: data.type,
     },
   });
 }

@@ -1,25 +1,17 @@
 import { db } from '../config/db';
-
-const USD_TO_CREDITS_RATE = 4;
-const MIN_CREDITS_PURCHASE = 100;
-
-export interface CreditPurchaseData {
-  amount: number;
-  transactionHash: string;
-}
+import { verifySolanaTransaction } from '../utils/transaction';
+import { MIN_CREDITS_PURCHASE, USD_TO_CREDITS_RATE, MIN_TRANSACTION_HASH_LENGTH } from '../utils/constants';
+import { CreditPurchaseData } from '../types';
 
 export const verifyTransaction = async (
   transactionHash: string, 
   expectedAmount: number
 ): Promise<boolean> => {
-  if (!transactionHash || transactionHash.length < 10) {
+  if (!transactionHash || transactionHash.length < MIN_TRANSACTION_HASH_LENGTH) {
     return false;
   }
   
-  // Simulate blockchain verification with a delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  return true;
+  return verifySolanaTransaction(transactionHash, expectedAmount);
 };
 
 export const purchaseCredits = async (
@@ -87,100 +79,6 @@ export const purchaseCredits = async (
   });
 };
 
-/**
- * Allocate credits to a drop
- */
-export const allocateCreditsForDrop = async (
-  dropId: string, 
-  userId: string, 
-  creditsToAllocate: number
-) => {
-  if (!creditsToAllocate || creditsToAllocate <= 0) {
-    throw new Error('Invalid credits amount');
-  }
-  
-  const drop = await db.drop.findFirst({
-    where: {
-      id: dropId,
-      creatorId: userId,
-    },
-    select: {
-      id: true,
-      name: true,
-      maxSupply: true,
-      creditsAllocated: true,
-    },
-  });
-  
-  if (!drop) {
-    throw new Error('Drop not found or you do not have permission to allocate credits to it');
-  }
-  
-  if (creditsToAllocate < drop.maxSupply) {
-    throw new Error(`You must allocate at least ${drop.maxSupply} credits (one per maximum supply)`);
-  }
-  
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      creditBalance: true,
-    },
-  });
-  
-  if (!user) {
-    throw new Error('User not found');
-  }
-  
-  if (user.creditBalance < creditsToAllocate) {
-    throw new Error(`Not enough credits. You have ${user.creditBalance} credits, but need ${creditsToAllocate}`);
-  }
-  
-  return db.$transaction(async (tx) => {
-    const transaction = await tx.creditTransaction.create({
-      data: {
-        amount: -creditsToAllocate,
-        description: `Allocated ${creditsToAllocate} credits to drop "${drop.name}"`,
-        userId,
-        dropId,
-      },
-    });
-    
-    const updatedUser = await tx.user.update({
-      where: { id: userId },
-      data: {
-        creditBalance: {
-          decrement: creditsToAllocate,
-        },
-      },
-      select: {
-        id: true,
-        creditBalance: true,
-      },
-    });
-    
-    const updatedDrop = await tx.drop.update({
-      where: { id: dropId },
-      data: {
-        creditsAllocated: {
-          increment: creditsToAllocate,
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        creditsAllocated: true,
-      },
-    });
-    
-    return {
-      transaction,
-      user: updatedUser,
-      drop: updatedDrop,
-    };
-  });
-};
-
 export const getUserCreditTransactions = async (
   userId: string, 
   page = 1, 
@@ -219,9 +117,6 @@ export const getUserCreditTransactions = async (
   };
 };
 
-/**
- * Get user's credit balance
- */
 export const getUserCreditBalance = async (userId: string) => {
   const user = await db.user.findUnique({
     where: { id: userId },
