@@ -50,7 +50,7 @@ export function useAuthStatus() {
         });
         
         // Register user with backend using axios
-        axios.post("http://localhost:3000/api/users/register", {
+        axios.post("https://twinn-h59i.onrender.com/api/users/register", {
           privyDID: user.id,
           email: user.email?.address,
           name,
