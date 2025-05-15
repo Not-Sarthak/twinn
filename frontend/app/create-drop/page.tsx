@@ -28,19 +28,33 @@ import Image from "next/image";
 import { usePrivy } from "@privy-io/react-auth";
 import { getWalletAddress } from "../lib/payment-services/payment";
 import { shortenAddress } from "../lib/utils";
+import { createDrop } from "../lib/services/drop.service";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function CreateDropPage() {
   const { formData, updateFormData } = useCreateDropStore();
   const [isUploading, setIsUploading] = useState(false);
   const [isCreatingNFT, setIsCreatingNFT] = useState(false);
+  const [isCreatingDrop, setIsCreatingDrop] = useState(false);
   const [ipfsResult, setIpfsResult] = useState<IPFSUploadResult | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [nftResponse, setNftResponse] = useState<CompressedNFTResponse | null>(
     null,
   );
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const { user } = usePrivy();
+  const [createdDropId, setCreatedDropId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { user, authenticated } = usePrivy();
   const walletAddress = getWalletAddress(user);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authenticated) {
+      // Redirect to login if not authenticated
+      router.push("/gallery");
+    }
+  }, [authenticated, router]);
 
   const {
     register,
@@ -160,9 +174,53 @@ export default function CreateDropPage() {
     }
   };
 
+  const createDropInBackend = async (data: DropFormValues, nftResponse: CompressedNFTResponse | null) => {
+    try {
+      setIsCreatingDrop(true);
+      setError(null);
+
+      // Prepare drop data for backend
+      const dropData = {
+        name: data.title,
+        description: data.description,
+        website: data.website && data.website.trim() !== "" ? `https://${data.website}` : undefined,
+        locationType: data.locationType,
+        location: data.locationType === "in-person" ? data.location : undefined,
+        startDate: data.dateRange?.from || new Date(),
+        endDate: data.dateRange?.to || data.dateRange?.from || new Date(),
+        maxSupply: data.attendees,
+        image: ipfsResult?.gateway_url || "",
+        artistInfo: data.artistInfo,
+        externalLink: data.website,
+        power: data.power,
+        mintAddress: nftResponse?.mintAddress,
+        metadataUri: nftResponse?.metadataUri,
+        uniqueCode: nftResponse?.uniqueCode || data.symbol,
+        collectionId: data.collectionId || "default", // You might want to let users select a collection
+      };
+
+      console.log("Creating drop with data:", dropData);
+      const response = await createDrop(dropData);
+      console.log("Drop created:", response);
+      
+      if (response && response.drop && response.drop.id) {
+        setCreatedDropId(response.drop.id);
+        return response.drop.id;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error creating drop:", error);
+      setError("Failed to create drop. Please try again.");
+      return null;
+    } finally {
+      setIsCreatingDrop(false);
+    }
+  };
+
   const onSubmit = async (data: DropFormValues) => {
     if (data.website && data.website.trim() !== "") {
-      data.website = `https://${data.website}`;
+      data.website = data.website.trim();
     }
 
     if (data.dateRange?.from) {
@@ -179,9 +237,12 @@ export default function CreateDropPage() {
     }
 
     let nftResult: CompressedNFTResponse | null = null;
-    if (data.recipientAddress) {
+    if (data.recipientAddress && data.createNFT) {
       nftResult = await createCompressedNFT(data);
     }
+
+    // Create drop in backend
+    const dropId = await createDropInBackend(data, nftResult);
 
     const submissionData = {
       ...data,
@@ -194,6 +255,7 @@ export default function CreateDropPage() {
           }
         : null,
       nftResponse: nftResult,
+      dropId,
     };
 
     updateFormData(submissionData);
@@ -207,15 +269,35 @@ export default function CreateDropPage() {
 
   const closeSuccessModal = () => {
     setShowSuccessModal(false);
+    if (createdDropId) {
+      router.push(`/drops/${createdDropId}`);
+    }
   };
+
+  if (!authenticated) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
+        <div className="text-lg text-text-secondary">Please log in to create a drop</div>
+        <Link
+          href="/gallery"
+          className="bg-primary flex items-center gap-2 rounded-lg px-4 py-2 text-white"
+        >
+          <ArrowLeft size={16} />
+          Back to Gallery
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center">
       <GridWrapper>
         <div className="px-6 py-10 md:px-10">
           <div className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Gallery
+            <Link href="/gallery" className="flex items-center gap-2 hover:text-orange-500">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Gallery
+            </Link>
           </div>
           <AnimatedText
             as="h1"
@@ -224,6 +306,12 @@ export default function CreateDropPage() {
           >
             Create your Drop.
           </AnimatedText>
+
+          {error && (
+            <div className="mx-auto mt-4 max-w-md rounded-lg bg-red-100 p-3 text-center text-red-600">
+              {error}
+            </div>
+          )}
 
           <form
             onSubmit={handleSubmit(onSubmit as any)}
@@ -424,6 +512,44 @@ export default function CreateDropPage() {
                   </div>
                 </FormField>
 
+                <FormField>
+                  <FormLabel htmlFor="locationType">Event Type</FormLabel>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="virtual"
+                        {...register("locationType")}
+                        defaultChecked={watch("locationType") === "virtual"}
+                        className="h-4 w-4 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span>Virtual</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="in-person"
+                        {...register("locationType")}
+                        defaultChecked={watch("locationType") === "in-person"}
+                        className="h-4 w-4 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span>In-Person</span>
+                    </label>
+                  </div>
+                </FormField>
+
+                {watch("locationType") === "in-person" && (
+                  <FormField>
+                    <FormLabel htmlFor="location">Location</FormLabel>
+                    <FormInput
+                      id="location"
+                      placeholder="City, Venue, etc."
+                      {...register("location")}
+                      error={errors.location}
+                    />
+                  </FormField>
+                )}
+
                 <div className="mb-6">
                   <FormField>
                     <FormLabel htmlFor="dateRange" required>
@@ -463,13 +589,35 @@ export default function CreateDropPage() {
                     min={1}
                   />
                 </FormField>
+
+                <FormField>
+                  <FormLabel htmlFor="artistInfo">Artist Info</FormLabel>
+                  <FormInput
+                    id="artistInfo"
+                    placeholder="Artist or creator name"
+                    {...register("artistInfo")}
+                    error={errors.artistInfo}
+                  />
+                </FormField>
+
+                <FormField>
+                  <FormLabel htmlFor="power">Power</FormLabel>
+                  <FormInput
+                    id="power"
+                    type="number"
+                    placeholder="0"
+                    {...register("power", { valueAsNumber: true })}
+                    error={errors.power}
+                    min={0}
+                  />
+                </FormField>
               </div>
             </div>
             <div className="flex items-center justify-center">
               <Button
                 type="submit"
-                className="mt-8 z-50 flex w-64 items-center justify-center bg-black font-garamond text-lg italic text-white hover:bg-black/80"
-                disabled={isUploading || isCreatingNFT}
+                className="z-50 mt-8 flex w-64 items-center justify-center bg-black font-garamond text-lg italic text-white hover:bg-black/80"
+                disabled={isUploading || isCreatingNFT || isCreatingDrop}
               >
                 {isCreatingNFT ? (
                   <span className="flex items-center gap-2">
@@ -495,6 +643,30 @@ export default function CreateDropPage() {
                     </svg>
                     Creating NFT...
                   </span>
+                ) : isCreatingDrop ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="h-4 w-4 animate-spin text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Creating Drop...
+                  </span>
                 ) : (
                   "Create Drop"
                 )}
@@ -510,6 +682,7 @@ export default function CreateDropPage() {
         onClose={closeSuccessModal}
         dropTitle={title || ""}
         nftResponse={nftResponse}
+        dropId={createdDropId}
       />
     </div>
   );

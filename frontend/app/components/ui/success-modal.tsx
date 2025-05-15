@@ -19,6 +19,7 @@ interface SuccessModalProps {
   onClose: () => void;
   dropTitle: string;
   nftResponse?: CompressedNFTResponse | null;
+  dropId?: string | null;
 }
 
 export function SuccessModal({
@@ -26,6 +27,7 @@ export function SuccessModal({
   onClose,
   dropTitle,
   nftResponse,
+  dropId,
 }: SuccessModalProps) {
   const claimUrl = nftResponse
     ? `${window.location.origin}/mint?mintAddress=${nftResponse.mintAddress}&uniqueCode=${nftResponse.uniqueCode}`

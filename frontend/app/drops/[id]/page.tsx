@@ -5,13 +5,14 @@ import Image from "next/image";
 import { useParams, useSearchParams } from "next/navigation";
 import { GridWrapper } from "../../components/ui/grid-wrapper";
 import { AnimatedText } from "../../components/ui/animated-text";
-import { CollectionsDummyData, POAPDummyData } from "../../lib/data";
-import { Collection, Drop } from "../../lib/types";
+import { Collection, Drop, EnhancedDrop } from "../../lib/types";
 import Link from "next/link";
-import { ArrowLeft, Calendar, ExternalLink } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, LoaderCircle } from "lucide-react";
 import { CollectorsSection } from "../../components/drop/collectors-section";
 import { Tilt } from "../../components/ui/tilt";
 import { CollectionCard } from "../../components/cards/collection-card";
+import { getDropById } from "../../lib/services/drop.service";
+import { getCollectionById } from "../../lib/services/collection.service";
 
 export default function DropDetailPage() {
   const params = useParams();
@@ -22,29 +23,71 @@ export default function DropDetailPage() {
   const [drop, setDrop] = useState<Drop | null>(null);
   const [collection, setCollection] = useState<Collection | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mintedDrops, setMintedDrops] = useState<any[]>([]);
+  const [moments, setMoments] = useState<any[]>([]);
 
   useEffect(() => {
-    const foundDrop = POAPDummyData.find((item) => item.id === id);
-    setDrop(foundDrop || null);
-
-    if (foundDrop) {
-      const collectionId = foundDrop.collectionId || collectionIdFromParams;
-
-      if (collectionId) {
-        const foundCollection = CollectionsDummyData.find(
-          (item) => item.id === collectionId,
-        );
-        setCollection(foundCollection || null);
+    async function fetchDropData() {
+      try {
+        setLoading(true);
+        
+        // Fetch drop data from API
+        const response = await getDropById(id);
+        
+        if (response && response.drop) {
+          setDrop(response.drop);
+          
+          // Set collection if it exists in the response
+          if (response.drop.collection) {
+            // Filter out default collections
+            const collectionData = response.drop.collection;
+            if (collectionData.name !== "Default Collection" && 
+                collectionData.id !== "default" && 
+                !collectionData.name?.toLowerCase().includes("default")) {
+              setCollection(collectionData);
+            }
+          } else if (response.drop.collectionId) {
+            // Fetch collection data if we only have the ID
+            try {
+              const collectionResponse = await getCollectionById(response.drop.collectionId);
+              if (collectionResponse && collectionResponse.collection) {
+                const collectionData = collectionResponse.collection;
+                // Filter out default collections
+                if (collectionData.name !== "Default Collection" && 
+                    collectionData.id !== "default" && 
+                    !collectionData.name?.toLowerCase().includes("default")) {
+                  setCollection(collectionData);
+                }
+              }
+            } catch (collectionError) {
+              console.error("Error fetching collection:", collectionError);
+            }
+          }
+          
+          // Set minted drops and moments if they exist in the response
+          if (response.minted) setMintedDrops(response.minted);
+          if (response.moments) setMoments(response.moments);
+        } else {
+          setError("Drop not found");
+        }
+      } catch (error) {
+        console.error(`Error fetching drop ${id}:`, error);
+        setError("Failed to load drop details.");
+      } finally {
+        setLoading(false);
       }
     }
 
-    setLoading(false);
+    if (id) {
+      fetchDropData();
+    }
   }, [id, collectionIdFromParams]);
 
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="text-lg text-text-secondary">Loading...</div>
+        <LoaderCircle className="h-8 w-8 animate-spin text-orange-500" />
       </div>
     );
   }
@@ -64,27 +107,51 @@ export default function DropDetailPage() {
     );
   }
 
+  // Get collection ID from drop or params
   const collectionId = drop.collectionId || collectionIdFromParams;
   const backLink = collectionId ? `/collections/${collectionId}` : "/gallery";
   const backText = collection
     ? `Back to ${collection.name}`
     : "Back to Gallery";
 
-  const enhancedDrop = {
-    ...drop,
-    collectionInfo: collection
+  // Don't show default collections
+  const shouldShowCollection = collection && 
+    !(collection.name === "Default Collection" || 
+      collection.id === "default" || 
+      collection.name?.toLowerCase().includes("default"));
+
+  // Prepare enhanced drop data with collection info
+  const enhancedDrop: EnhancedDrop = {
+    ...drop!,
+    collectionInfo: shouldShowCollection && collection
       ? {
           id: collection.id,
           name: collection.name,
-          image: collection.image,
+          image: collection.image || collection.logo || "https://via.placeholder.com/400",
           type: collection.type,
-          coverImage: collection.coverImage || collection.image,
+          coverImage: collection.coverImage || collection.image || collection.logo || "https://via.placeholder.com/400",
         }
       : undefined,
+    minted: mintedDrops,
+    moments: moments,
   };
+
+  // Format date from various possible sources
+  const displayDate = drop?.date || 
+    (drop?.startDate ? new Date(drop.startDate).toLocaleDateString() : 
+    (drop?.createdAt ? new Date(drop.createdAt).toLocaleDateString() : ""));
+
+  // Website URL handling
+  const websiteUrl = drop?.externalLink || drop?.website;
 
   return (
     <div className="mt-6 space-y-10 md:space-y-16">
+      {error && (
+        <div className="mx-auto max-w-4xl px-4 text-center text-orange-500">
+          {error}
+        </div>
+      )}
+      
       <section>
         <GridWrapper>
           <div className="relative px-10 py-4">
@@ -106,7 +173,7 @@ export default function DropDetailPage() {
                   <div className="absolute inset-0 z-10 bg-gradient-to-tr from-orange-400/10 to-pink-300/10"></div>
                   <Image
                     src={drop.image}
-                    alt={drop.title}
+                    alt={drop.title || drop.name || ""}
                     width={200}
                     height={200}
                     className="h-full w-full object-cover"
@@ -125,15 +192,15 @@ export default function DropDetailPage() {
                   delay={0}
                   className="pt-2 text-3xl font-medium leading-tight tracking-tighter text-text-primary md:text-4xl"
                 >
-                  {drop.title}
+                  {drop.title || drop.name || ""}
                 </AnimatedText>
 
                 <AnimatedText className="flex items-center gap-2 text-sm text-text-secondary">
                   <Calendar size={16} />
-                  {drop.date}
+                  {displayDate}
                 </AnimatedText>
 
-                {collection && (
+                {shouldShowCollection && collection && (
                   <div className="mt-4 flex items-center gap-2">
                     <div className="rounded-lg border-[1px] border-dashed border-[#81E7AF] bg-[#81E7AF]/10 px-2 py-1">
                       <div className="text-sm font-medium text-slate-700">
@@ -161,18 +228,18 @@ export default function DropDetailPage() {
                   </div>
                 )}
 
-                {drop.externalLink && (
+                {websiteUrl && (
                   <Link
-                    href={`https://${drop.externalLink}`}
+                    href={`https://${websiteUrl}`}
                     target="_blank"
                     className="text-primary mt-4 flex items-center gap-1 text-sm text-orange-500 hover:underline"
                   >
-                    {drop.externalLink} <ExternalLink size={14} />
+                    {websiteUrl} <ExternalLink size={14} />
                   </Link>
                 )}
 
                 <div className="mt-8 flex flex-wrap gap-6">
-                  {drop.supply && (
+                  {(drop.supply || drop.maxSupply) && (
                     <div className="flex items-center gap-2 rounded-lg border-[1px] border-dashed border-orange-500 bg-orange-100 px-2 py-0.5">
                       <div className="text-orange-500">
                         <svg
@@ -193,7 +260,7 @@ export default function DropDetailPage() {
                         </svg>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="text-lg font-medium">{drop.supply}</div>
+                        <div className="text-lg font-medium">{drop.supply || drop.maxSupply}</div>
                         <div className="text-xs text-text-secondary">
                           Supply
                         </div>
@@ -226,7 +293,7 @@ export default function DropDetailPage() {
                     </div>
                   )}
 
-                  {collection && (
+                  {shouldShowCollection && (
                     <div className="flex items-center gap-2 rounded-lg border-[1px] border-dashed border-[#81E7AF] bg-[#81E7AF]/10 px-2 py-0.5">
                       <div className="text-[#81E7AF]">
                         <svg
@@ -262,7 +329,7 @@ export default function DropDetailPage() {
                     </div>
                   )}
 
-                  {drop.transfers && (
+                  {(drop.transfers || mintedDrops.length > 0) && (
                     <div className="flex items-center gap-2 rounded-lg border-[1px] border-dashed border-[#FFA725] bg-[#FFA725]/10 px-2 py-0.5">
                       <div className="text-[#FFA725]">
                         <svg
@@ -284,7 +351,7 @@ export default function DropDetailPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-lg font-medium">
-                          {drop.transfers}
+                          {drop.transfers || mintedDrops.length}
                         </div>
                         <div className="text-xs text-text-secondary">
                           Transfers
@@ -293,13 +360,23 @@ export default function DropDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Debug Mint Link */}
+                <div className="mt-6">
+                  <Link
+                    href={`/mint/${drop.id}`}
+                    className="flex w-fit items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white hover:bg-orange-600"
+                  >
+                    Mint This Drop
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
         </GridWrapper>
 
-        {(drop.collectors || collection) && (
-          <CollectorsSection drop={enhancedDrop} />
+        {((enhancedDrop.minted && enhancedDrop.minted.length > 0) || enhancedDrop.collectionInfo) && (
+          <CollectorsSection drop={enhancedDrop as any} />
         )}
       </section>
     </div>

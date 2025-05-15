@@ -10,13 +10,68 @@ import { AnimatedTabs } from "../components/ui/animated-tabs";
 import { POAPDummyData } from "../lib/data";
 import { Drop } from "../lib/types";
 import { GrayButton } from "../components/buttons/gray-button";
+import { getDrops } from "../lib/services/drop.service";
+import { useAuthStatus } from "../lib/hooks/use-auth-status";
 
 export default function GalleryPage() {
   const id = useId();
   const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState("Featured");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState("All");
+  const [drops, setDrops] = useState<Drop[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuthStatus();
 
+  // Fetch drops from the backend
+  useEffect(() => {
+    async function fetchDrops() {
+      try {
+        setIsLoading(true);
+        const response = await getDrops();
+        
+        if (response && response.drops && Array.isArray(response.drops)) {
+          // Map API response to match the Drop type
+          const formattedDrops = response.drops.map((drop: any) => ({
+            id: drop.id,
+            title: drop.name || drop.title,
+            name: drop.name,
+            image: drop.image || "https://via.placeholder.com/400",
+            date: new Date(drop.startDate || drop.createdAt).toLocaleDateString(),
+            description: drop.description,
+            supply: drop.maxSupply || drop.numberOfSupply,
+            power: drop.power,
+            isFeatured: drop.isFeatured || false,
+            numberOfCollectors: drop.numberOfCollectors || 0,
+            location: drop.location,
+            artistInfo: drop.artistInfo,
+            externalLink: drop.externalLink,
+            collectionId: drop.collectionId,
+          }));
+          
+          setDrops(formattedDrops);
+          
+          if (formattedDrops.length === 0) {
+            setError("No Drops Found. Create a new Drop to get started.");
+          } else {
+            setError(null);
+          }
+        } else {
+          // Fallback to dummy data if API doesn't return expected format
+          setDrops(POAPDummyData);
+          setError("API Returned Unexpected Data Format. Using Sample Data Instead.");
+        }
+      } catch (error) {
+        setError("Failed to Load Drops. Using Sample Data Instead.");
+        setDrops(POAPDummyData);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchDrops();
+  }, []);
+
+  // Handle search input changes
   useEffect(() => {
     if (inputValue) {
       setIsLoading(true);
@@ -28,27 +83,35 @@ export default function GalleryPage() {
     setIsLoading(false);
   }, [inputValue]);
 
-  const filteredPoaps = useMemo(() => {
+  const filteredDrops = useMemo(() => {
     const searchTerm = inputValue.toLowerCase().trim();
 
     if (!searchTerm) {
-      return POAPDummyData;
+      return drops;
     }
 
-    return POAPDummyData.filter(
-      (poap) =>
-        poap.id.toLowerCase().includes(searchTerm) ||
-        poap.title.toLowerCase().includes(searchTerm),
+    return drops.filter(
+      (drop) =>
+        (drop.id && drop.id.toLowerCase().includes(searchTerm)) ||
+        (drop.title && drop.title.toLowerCase().includes(searchTerm)) ||
+        (drop.name && drop.name.toLowerCase().includes(searchTerm)) ||
+        (drop.description && drop.description.toLowerCase().includes(searchTerm)),
     );
-  }, [inputValue]);
+  }, [inputValue, drops]);
 
   const renderGalleryGrid = (items: Drop[]) => (
-    <div className="mx-auto grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
-      {items.length > 0 ? (
-        items.map((item, index) => <GalleryCard key={index} {...item} />)
+    <div className="mx-auto grid w-full grid-cols-1 gap-2 sm:grid-cols-1 md:grid-cols-4">
+      {isLoading ? (
+        <div className="col-span-full flex justify-center py-16">
+          <LoaderCircle className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      ) : items.length > 0 ? (
+        items.map((item, index) => <GalleryCard key={item.id || index} {...item} />)
       ) : (
         <div className="col-span-full py-16 text-center text-text-secondary">
-          No results found. Try a different search term.
+          {activeTab === "Featured" ? 
+            "No featured drops found. Check the 'All' tab to see all drops." : 
+            "No results found. Try a different search term or create a new drop."}
         </div>
       )}
     </div>
@@ -56,12 +119,12 @@ export default function GalleryPage() {
 
   const tabs = [
     {
-      label: "Featured",
-      icon: Star,
-    },
-    {
       label: "All",
       icon: List,
+    },
+    {
+      label: "Featured",
+      icon: Star,
     },
     {
       label: "Activity",
@@ -70,21 +133,18 @@ export default function GalleryPage() {
   ];
 
   const renderContent = () => {
-    const itemsToRender = inputValue ? filteredPoaps : POAPDummyData;
+    const itemsToRender = inputValue ? filteredDrops : drops;
 
     switch (activeTab) {
       case "Featured":
-        return renderGalleryGrid(
-          itemsToRender.filter((item) => item.isFeatured),
-        );
+        const featuredItems = itemsToRender.filter((item) => item.isFeatured);
+        return renderGalleryGrid(featuredItems);
       case "All":
         return renderGalleryGrid(itemsToRender);
       case "Activity":
         return (
           <div className="flex items-center justify-center">
-            <p className="text-lg text-text-secondary">
-              Activity Content
-            </p>
+            <p className="text-lg text-text-secondary">Activity Content</p>
           </div>
         );
       default:
@@ -97,8 +157,10 @@ export default function GalleryPage() {
       <section>
         <GridWrapper>
           <div className="relative text-balance py-4">
-            <div className="absolute right-4 top-4">
+            <div className="absolute right-4 top-4 hidden md:block">
+              {isAuthenticated && (
               <GrayButton text="Create Drop" href="/create-drop" />
+              )}
             </div>
 
             <AnimatedText
@@ -108,6 +170,13 @@ export default function GalleryPage() {
             >
               Twinn Gallery
             </AnimatedText>
+            
+            <div className="mt-2 mb-4 flex justify-center md:hidden">
+              {isAuthenticated && (
+                <GrayButton text="Create Drop" href="/create-drop" />
+              )}
+            </div>
+            
             <div className="mt-4 flex justify-center">
               <div className="w-full max-w-md">
                 <div className="relative">
@@ -142,10 +211,16 @@ export default function GalleryPage() {
                 onTabChange={setActiveTab}
               />
             </div>
+            
+            {error && (
+              <div className="mt-4 text-center text-sm text-orange-500">
+                {error}
+              </div>
+            )}
           </div>
         </GridWrapper>
 
-        <div className="my-8">{renderContent()}</div>
+        <div className="my-8 flex justify-center items-center w-full">{renderContent()}</div>
       </section>
     </div>
   );

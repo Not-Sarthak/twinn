@@ -26,14 +26,20 @@ export async function createNFTToken(data: {
     console.log('Making NFT creation request to:', `${API_URL}/api/compressed-nft`);
     console.log('Request data:', data);
     
+    // Get auth token if available
+    const userDID = typeof window !== 'undefined' ? localStorage.getItem("userDID") : null;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (userDID) {
+      headers['Authorization'] = `Bearer ${userDID}`;
+    }
+    
     const response = await axios.post<CompressedNFTResponse>(
       `${API_URL}/api/compressed-nft`, 
       data,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers }
     );
     
     console.log("API Response:", response.data);
@@ -42,12 +48,16 @@ export async function createNFTToken(data: {
   } catch (error) {
     console.error("Error creating NFT:", error);
     
-    if (axios.isAxiosError(error) && error.response) {
-      const errorData = error.response.data;
+    if (axios.isAxiosError(error)) {
+      const statusCode = error.response?.status;
+      const errorData = error.response?.data;
+      
+      console.error(`API Error (${statusCode}):`, errorData);
+      
       const errorMessage = 
         (errorData && errorData.error) || 
         (errorData && errorData.details) || 
-        "Failed to create NFT";
+        (statusCode === 404 ? "API endpoint not found. Please check server configuration." : "Failed to create NFT");
       
       throw new Error(errorMessage);
     } else {
@@ -65,14 +75,20 @@ export async function claimNFTToken(data: {
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
     
+    // Get auth token if available
+    const userDID = typeof window !== 'undefined' ? localStorage.getItem("userDID") : null;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (userDID) {
+      headers['Authorization'] = `Bearer ${userDID}`;
+    }
+    
     const response = await axios.post<{ transferTxId: string }>(
       `${API_URL}/api/compressed-nft/claim`, 
       data,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers }
     );
     
     return response.data;
@@ -80,12 +96,16 @@ export async function claimNFTToken(data: {
   } catch (error) {
     console.error("Error claiming NFT:", error);
     
-    if (axios.isAxiosError(error) && error.response) {
-      const errorData = error.response.data;
+    if (axios.isAxiosError(error)) {
+      const statusCode = error.response?.status;
+      const errorData = error.response?.data;
+      
+      console.error(`API Error (${statusCode}):`, errorData);
+      
       const errorMessage = 
         (errorData && errorData.error) || 
         (errorData && errorData.details) || 
-        "Failed to claim NFT";
+        (statusCode === 404 ? "API endpoint not found. Please check server configuration." : "Failed to claim NFT");
       
       throw new Error(errorMessage);
     } else {

@@ -1,51 +1,88 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 export function useAuthStatus() {
   const { authenticated, ready, user } = usePrivy();
-  const [isClient, setIsClient] = useState(false);
-  const [storedDID, setStoredDID] = useState<string | null>(null);
-  const [storedAddress, setStoredAddress] = useState<string | null>(null);
+  const [solanaAddress, setSolanaAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    if (isClient) {
-      const did = localStorage.getItem("userDID");
-      const address = localStorage.getItem("solanaAddress");
-
-      setStoredDID(did);
-      setStoredAddress(address);
-    }
-  }, [isClient]);
-
-  useEffect(() => {
-    if (authenticated && user) {
-      setStoredDID(user.id);
-
-      const solanaWallet = user.linkedAccounts?.find(
-        (account) =>
-          account.type === "wallet" && account.chainType === "solana",
+    if (user?.linkedAccounts) {
+      const solanaWallet = user.linkedAccounts.find(
+        (account) => account.type === "wallet" && account.chainType === "solana"
       );
+      
+      if (solanaWallet && "address" in solanaWallet) {
+        const address = (solanaWallet as any).address;
+        setSolanaAddress(address);
+        localStorage.setItem("solanaAddress", address);
+      }
+    }
+  }, [user]);
 
-      if (solanaWallet) {
-        setStoredAddress((solanaWallet as any).address);
+  // Register user with backend when authenticated
+  useEffect(() => {
+    if (authenticated && user && user.id) {
+      localStorage.setItem("userDID", user.id);
+      
+      const solanaWallet = user.linkedAccounts?.find(
+        (account) => account.type === "wallet" && account.chainType === "solana"
+      );
+      
+      if (solanaWallet && "address" in solanaWallet) {
+        const walletAddress = (solanaWallet as any).address;
+        
+        // Log all user properties to debug
+        console.log("Full user object:", user);
+        
+        // Get name from the user object
+        const name = user.google?.name || "Sarthak Shah";
+        
+        console.log("Using name:", name);
+        
+        console.log("Registering user with backend:", {
+          privyDID: user.id,
+          email: user.email?.address,
+          name,
+          walletAddress: walletAddress
+        });
+        
+        // Register user with backend using axios
+        axios.post("http://localhost:3000/api/users/register", {
+          privyDID: user.id,
+          email: user.email?.address,
+          name,
+          walletAddress: walletAddress
+        })
+        .then(response => {
+          console.log("User registration successful:", response.data);
+        })
+        .catch(error => {
+          console.error("User registration failed:", error.response?.data || error.message);
+        });
       }
     }
   }, [authenticated, user]);
 
-  const isAuthenticated = authenticated || (isClient && !!storedDID);
+  if (authenticated && user) {
+    console.log("Authenticated", authenticated);
+    console.log("User ID", user?.id);
+    console.log("User Created At", user?.createdAt);
+    console.log("Email", user?.email?.address);
+    console.log("Name:", user?.google?.name);
+    console.log("Solana Address:", solanaAddress);
+  }
 
   return {
-    isAuthenticated,
+    isAuthenticated: authenticated,
     ready,
     user,
-    storedDID,
-    storedAddress,
-    isClient,
+    userDID: user?.id,
+    userEmail: user?.email?.address,
+    userName: user?.google?.name,
+    userSolanaAddress: solanaAddress,
+    userCreatedAt: user?.createdAt,
   };
 }

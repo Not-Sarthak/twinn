@@ -10,6 +10,14 @@ interface CollectionsGridProps {
   isLoading?: boolean;
 }
 
+interface CollectionsGridItemProps {
+  collection: Collection;
+}
+
+const CollectionsGridItem = ({ collection }: CollectionsGridItemProps) => {
+  return <CollectionCard {...collection} />;
+};
+
 export const CollectionsGrid = ({
   collections,
   isLoading = false,
@@ -42,3 +50,6 @@ export const CollectionsGrid = ({
     </div>
   );
 };
+
+// Add Item as a static property to CollectionsGrid
+CollectionsGrid.Item = CollectionsGridItem;

@@ -11,6 +11,8 @@ import { registerCollectionRoutes } from '../routes/collection.routes';
 import { registerDropRoutes } from '../routes/drop.routes';
 import { registerMomentRoutes } from '../routes/moment.routes';
 import { registerCreditRoutes } from '../routes/credit.routes';
+import { createCompressedNFT, transferCompressedToken } from '../services/compressed-nft.service';
+import { authenticate, requireAuth } from '../utils/auth';
 
 export const buildServer = (): FastifyInstance => {
   const server = fastify({
@@ -80,6 +82,40 @@ export const buildServer = (): FastifyInstance => {
       deepLinking: false,
     },
   });
+
+  // Register compressed NFT endpoints
+  server.post('/api/compressed-nft', async (request, reply) => {
+    try {
+      const data = request.body as any;
+      const result = await createCompressedNFT({
+        name: data.name,
+        symbol: data.symbol,
+        description: data.description,
+        supply: data.supply,
+        recipientAddress: data.recipientAddress,
+        image: data.image
+      });
+      return reply.code(201).send(result);
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(500).send({ error: 'Error creating compressed NFT', details: error.message });
+    }
+  });
+
+  server.post('/api/compressed-nft/claim', { preHandler: [authenticate] }, requireAuth(async (request, reply, userId) => {
+    try {
+      const data = request.body as any;
+      const result = await transferCompressedToken(
+        data.mintAddress,
+        data.amount || 1,
+        data.recipientAddress
+      );
+      return reply.code(201).send(result);
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(500).send({ error: 'Error claiming NFT', details: error.message });
+    }
+  }));
 
   registerUserRoutes(server, '/api/users');
   registerCollectionRoutes(server, '/api/collections');

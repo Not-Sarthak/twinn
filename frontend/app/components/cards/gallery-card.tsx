@@ -53,7 +53,7 @@ function GalleryCard({
             <div className="mb-2 h-36 w-36 overflow-hidden rounded-full border-4 border-white">
               <Image
                 src={image}
-                alt={title}
+                alt={title || "Drop Image"}
                 width={144}
                 height={144}
                 className="h-full w-full object-cover"
@@ -69,7 +69,7 @@ function GalleryCard({
             <div className="text-left">
               <div className="mt-2 flex items-center gap-1 text-sm text-text-secondary">
                 <span className="">ID</span>
-                <p className="">{id}</p>
+                <p className="">{id && id.length > 8 ? `${id.substring(0, 8)}...` : id}</p>
               </div>
               <div className="truncate text-xl font-semibold text-text-primary">
                 {title}

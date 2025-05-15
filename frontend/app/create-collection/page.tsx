@@ -27,15 +27,7 @@ import {
 import { uploadToIPFS } from "../lib/utils";
 import { IPFSUploadResult } from "../lib/types";
 import Image from "next/image";
-
-const COLLECTION_TYPES = [
-  "Organization",
-  "Artist",
-  "Event",
-  "Community",
-  "Personal",
-  "Other",
-];
+import { COLLECTION_TYPES } from "../lib/constants";
 
 export default function CreateCollectionPage() {
   const router = useRouter();
@@ -146,63 +138,87 @@ export default function CreateCollectionPage() {
   };
 
   useEffect(() => {
-    const mockUserDrops = [
-      {
-        id: "1",
-        title: "ETH Global 2023",
-        image: "https://placehold.co/400x400/purple/white?text=Drop1",
-      },
-      {
-        id: "2",
-        title: "Devcon VI",
-        image: "https://placehold.co/400x400/blue/white?text=Drop2",
-      },
-      {
-        id: "3",
-        title: "NFT NYC 2023",
-        image: "https://placehold.co/400x400/green/white?text=Drop3",
-      },
-    ];
-    setUserDrops(mockUserDrops);
+    // Fetch real user drops instead of using mock data
+    async function fetchUserDrops() {
+      try {
+        const userDID = localStorage.getItem("userDID");
+        if (userDID) {
+          // Use the drop service instead of direct fetch
+          const { getDrops } = await import("../lib/services/drop.service");
+          const response = await getDrops({ creatorId: userDID });
+          
+          if (response && response.drops) {
+            // Filter out any default drops
+            const filteredDrops = response.drops.filter(drop => 
+              drop.name !== "Default Drop" && 
+              drop.id !== "default" &&
+              !(drop.name?.toLowerCase()?.includes("default"))
+            );
+            
+            // Map the drops to ensure they have the expected format
+            const formattedDrops = filteredDrops.map(drop => ({
+              id: drop.id,
+              title: drop.title || drop.name,
+              name: drop.name,
+              image: drop.image || "https://via.placeholder.com/400"
+            }));
+            
+            setUserDrops(formattedDrops);
+          } else {
+            setUserDrops([]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user drops:", error);
+        setUserDrops([]);
+      }
+    }
+
+    fetchUserDrops();
   }, []);
 
-  const filteredDrops = userDrops.filter((drop) =>
-    drop.title.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredDrops = userDrops.filter((drop) => {
+    // Use title or name property, and safely check if it exists
+    const dropTitle = drop.title || drop.name || '';
+    return dropTitle.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
-  const onSubmit = (data: CollectionFormValues) => {
-    setIsSubmitting(true);
+  const onSubmit = async (data: CollectionFormValues) => {
+    try {
+      setIsSubmitting(true);
 
-    const submissionData = {
-      ...data,
-      link: data.link ? `https://${data.link.replace(/^https?:\/\//, "")}` : "",
-      ipfs: {
-        logo: logoIpfsResult || null,
-        cover: coverIpfsResult || null,
-      },
-    };
+      const submissionData = {
+        ...data,
+        link: data.link ? `https://${data.link.replace(/^https?:\/\//, "")}` : "",
+        ipfs: {
+          logo: logoIpfsResult || null,
+          cover: coverIpfsResult || null,
+        },
+      };
 
-    updateFormData(submissionData);
+      updateFormData(submissionData);
 
-    console.log(
-      "Collection submission data:",
-      JSON.stringify(submissionData, null, 2),
-    );
+      console.log(
+        "Collection submission data:",
+        JSON.stringify(submissionData, null, 2),
+      );
 
-    // In a real app, this would submit the form to an API using axios
-    // Example:
-    // axios.post('/api/collections', submissionData)
-    //   .then((response) => {
-    //     router.push(`/collections/${response.data.id}`);
-    //   })
-    //   .catch((error) => {
-    //     console.error('Error creating collection:', error);
-    //   });
-
-    setTimeout(() => {
+      // Submit the form to the API
+      const { createCollection } = await import("../lib/services/collection.service");
+      const response = await createCollection(submissionData);
+      
+      if (response && response.collection) {
+        console.log("Collection created successfully:", response.collection);
+        router.push(`/collections/${response.collection.id}`);
+      } else {
+        throw new Error("Failed to create collection");
+      }
+    } catch (error) {
+      console.error("Error creating collection:", error);
+      alert("Failed to create collection. Please try again.");
+    } finally {
       setIsSubmitting(false);
-      router.push("/collections");
-    }, 1000);
+    }
   };
 
   return (
@@ -638,7 +654,7 @@ export default function CreateCollectionPage() {
                           width={160}
                           height={160}
                           src={drop.image}
-                          alt={drop.title}
+                          alt={drop.title || drop.name || "Drop"}
                           className="h-full w-full object-cover"
                         />
                         {watch("drops")?.includes(drop.id) && (
@@ -661,7 +677,7 @@ export default function CreateCollectionPage() {
                         )}
                       </div>
                       <p className="truncate text-center text-xs">
-                        {drop.title}
+                        {drop.title || drop.name || "Untitled Drop"}
                       </p>
                     </div>
                   ))}

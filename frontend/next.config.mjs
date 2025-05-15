@@ -16,6 +16,7 @@ const config = {
       "gateway.pinata.cloud",
       "solana.com",
       "magiceden.io",
+      "via.placeholder.com",
     ],
   },
   async redirects() {

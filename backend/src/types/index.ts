@@ -79,6 +79,7 @@ export interface IDrop {
   name: string;
   description?: string;
   website?: string;
+  locationType?: string;
   location?: string;
   startDate: Date;
   endDate: Date;
@@ -102,6 +103,7 @@ export interface IDropCreate {
   name: string;
   description?: string;
   website?: string;
+  locationType?: string;
   location?: string;
   startDate: Date;
   endDate: Date;

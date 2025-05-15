@@ -2,26 +2,26 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export function LogoutButton() {
   const { logout } = usePrivy();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const router = useRouter();
 
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
+      
+      // Clear user data from local storage
       localStorage.removeItem("userDID");
       localStorage.removeItem("solanaAddress");
 
+      // Logout from Privy
       await logout();
 
-      router.push("/");
-      router.refresh();
+      // Redirect to home page
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout Failed:", error);
-    } finally {
       setIsLoggingOut(false);
     }
   };

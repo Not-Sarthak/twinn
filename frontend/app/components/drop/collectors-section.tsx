@@ -79,7 +79,7 @@ export function CollectorsSection({ drop }: CollectorsSectionProps) {
                     image={drop.collectionInfo.image}
                     type={drop.collectionInfo.type}
                     description=""
-                    creator=""
+                    creator={{ id: "", name: "" }}
                     dropCount={0}
                     collectorsCount={0}
                     isVerified={false}

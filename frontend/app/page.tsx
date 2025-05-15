@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { MomentsBento } from "./components/landing/moments-bento";
 import { CalendarBento } from "./components/landing/calendar-bento";
 import { ConnectionsBento } from "./components/landing/connections-bento";
@@ -9,12 +12,50 @@ import { ScrapbookBento } from "./components/landing/scrapbook-bento";
 import { MintNFT } from "./components/landing/mint-nft-bento";
 import { BentoPattern } from "./components/svg/bento-pattern";
 import { HeroVideo } from "./components/landing/hero-video";
+import { useAuthStatus } from "./lib/hooks/use-auth-status";
+import { getDrops } from "./lib/services/drop.service";
+import { GrayButton } from "./components/buttons/gray-button";
+import { LoaderCircle } from "lucide-react";
+import { GalleryCard } from "./components/cards/gallery-card";
+import { Drop } from "./lib/types";
 
-export default async function Home() {
+export default function Home() {
   const PROFILE_DELAY = 0;
   const HEADING_DELAY = PROFILE_DELAY + 0.2;
   const PARAGRAPH_DELAY = HEADING_DELAY + 0.1;
   const PHOTOS_DELAY = PARAGRAPH_DELAY + 0.1;
+  
+  const { isAuthenticated, userDID } = useAuthStatus();
+  const [userDrops, setUserDrops] = useState<Drop[]>([]);
+  const [loadingDrops, setLoadingDrops] = useState<boolean>(false);
+
+  // Fetch user's drops if authenticated
+  useEffect(() => {
+    if (isAuthenticated && userDID) {
+      async function fetchUserDrops() {
+        try {
+          setLoadingDrops(true);
+          const response = await getDrops({ creatorId: userDID });
+          
+          if (response && response.drops) {
+            // Filter out default drops
+            const filteredDrops = response.drops.filter(drop => 
+              drop.name !== "Default Drop" && 
+              drop.id !== "default" &&
+              !drop.name?.toLowerCase().includes("default")
+            );
+            setUserDrops(filteredDrops);
+          }
+        } catch (error) {
+          console.error("Error fetching user drops:", error);
+        } finally {
+          setLoadingDrops(false);
+        }
+      }
+
+      fetchUserDrops();
+    }
+  }, [isAuthenticated, userDID]);
 
   return (
     <section>
@@ -51,6 +92,37 @@ export default async function Home() {
             </div>
           </div>
         </section>
+
+        {/* My Drops Section - Only shown when user is authenticated */}
+        {isAuthenticated && (
+          <section>
+            <GridWrapper>
+              <div className="relative text-balance px-6 py-8 md:px-10">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-garamond italic font-medium">My Drops</h2>
+                  <GrayButton text="Create New Drop" href="/create-drop" />
+                </div>
+
+                {loadingDrops ? (
+                  <div className="flex justify-center py-16">
+                    <LoaderCircle className="h-8 w-8 animate-spin text-orange-500" />
+                  </div>
+                ) : userDrops.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {userDrops.map((drop) => (
+                      <GalleryCard key={drop.id} {...drop} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <p className="text-lg text-text-secondary mb-4">You haven&apos;t created any drops yet</p>
+                    <GrayButton text="Create Drop" href="/create-drop" />
+                  </div>
+                )}
+              </div>
+            </GridWrapper>
+          </section>
+        )}
 
         {/* About Section */}
         <section className="relative space-y-10 md:space-y-16">

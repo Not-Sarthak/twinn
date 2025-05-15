@@ -43,7 +43,7 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
       (collection) =>
         collection.id.toLowerCase().includes(term) ||
         collection.name.toLowerCase().includes(term) ||
-        collection.description.toLowerCase().includes(term),
+        collection?.description?.toLowerCase().includes(term),
     );
   },
 

@@ -12,19 +12,7 @@ export function LoginButton() {
   useEffect(() => {
     if (authenticated && user) {
       try {
-        if (user.id) {
-          localStorage.setItem("userDID", user.id);
-        }
-
-        const solanaWallet = user.linkedAccounts?.find(
-          (account) =>
-            account.type === "wallet" && account.chainType === "solana",
-        );
-
-        if (solanaWallet && "address" in solanaWallet) {
-          localStorage.setItem("solanaAddress", (solanaWallet as any).address);
-        }
-
+        console.log("User authenticated:", user.id);
         router.refresh();
       } catch (error) {
         console.error("Error:", error);

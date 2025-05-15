@@ -30,7 +30,6 @@ export async function createUser(data: IUserCreate) {
       email: data.email || null,
       name: data.name,
       walletAddress: data.walletAddress,
-      profileImage: data.profileImage
     },
   });
 }
@@ -78,7 +77,6 @@ export async function getUserByEmail(email: string): Promise<IUserResponse | nul
 
   const stats = await getUserStats(user.id);
 
-  // Convert to response format
   return {
     ...user,
     email: user.email ?? undefined,
@@ -86,16 +84,24 @@ export async function getUserByEmail(email: string): Promise<IUserResponse | nul
   };
 }
 
-// For backward compatibility and frontend response
 export function mapUserToResponse(user: any): IUserWithLinkedWallet {
   return {
-    ...user,
+    id: user.id,
+    name: user.name,
+    email: user.email ?? undefined,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     linkedWallet: user.walletAddress,
-  };
+    ...(user.numberOfCollectionsCreated !== undefined && {
+      numberOfCollectionsCreated: user.numberOfCollectionsCreated,
+      numberOfDropsCreated: user.numberOfDropsCreated,
+      numberOfMomentsCreated: user.numberOfMomentsCreated,
+      numberOfMintedDrops: user.numberOfMintedDrops,
+    }),
+  } as IUserWithLinkedWallet;
 }
 
 export async function updateUser(id: string, data: Partial<IUserCreate>) {
-  // Remove id from the data if present to prevent changing the privyDID
   if ('id' in data) {
     delete data.id;
   }

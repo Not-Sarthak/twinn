@@ -27,15 +27,42 @@ function sanitizeDrop(drop: any) {
  * Create a new drop
  */
 export async function createDrop(data: IDropCreate, creatorId: string) {
-  const collection = await db.collection.findFirst({
-    where: {
-      id: data.collectionId,
-      creatorId,
-    },
-  });
-
-  if (!collection) {
-    throw new Error('Collection not found or you do not have permission to add drops to it');
+  let collectionToUse = null;
+  
+  // Try to find the specified collection first
+  if (data.collectionId) {
+    collectionToUse = await db.collection.findFirst({
+      where: {
+        id: data.collectionId,
+        creatorId,
+      },
+    });
+  }
+  
+  // If no collection found or specified, try to find or create a default collection for the user
+  if (!collectionToUse) {
+    // Look for a default collection
+    collectionToUse = await db.collection.findFirst({
+      where: {
+        creatorId,
+        name: "Default Collection",
+      },
+    });
+    
+    // If no default collection exists, create one
+    if (!collectionToUse) {
+      collectionToUse = await db.collection.create({
+        data: {
+          name: "Default Collection",
+          description: "Default collection for drops",
+          creatorId,
+          type: "STANDARD",
+        },
+      });
+    }
+    
+    // Update the drop data with the default collection ID
+    data.collectionId = collectionToUse.id;
   }
 
   // Get user wallet address for NFT recipient
@@ -65,8 +92,8 @@ export async function createDrop(data: IDropCreate, creatorId: string) {
   try {
     nftData = await createCompressedNFT({
       name: data.name,
-      symbol: collection.name.substring(0, 5).toUpperCase(), // Generate symbol from collection name
-      description: data.description || `Drop from ${collection.name}`,
+      symbol: collectionToUse.name.substring(0, 5).toUpperCase(), // Generate symbol from collection name
+      description: data.description || `Drop from ${collectionToUse.name}`,
       supply: data.maxSupply,
       recipientAddress: user.walletAddress,
       image: data.image

@@ -49,29 +49,31 @@ export async function getCollectionById(id: string): Promise<ICollectionResponse
 
   if (!collection) return null;
 
-  const [dropsCount, totalMints, momentsCount] = await Promise.all([
+  const [dropsCount, momentsCount] = await Promise.all([
     db.drop.count({ where: { collectionId: id } }),
-    db.$queryRaw`
-      SELECT COUNT(*) as count
-      FROM "NFT"
-      WHERE "dropId" IN (
-        SELECT id FROM "Drop" WHERE "collectionId" = ${id}
-      )
-    `,
-    db.$queryRaw`
-      SELECT COUNT(*) as count
-      FROM "Moment"
-      WHERE "dropId" IN (
-        SELECT id FROM "Drop" WHERE "collectionId" = ${id}
-      )
-    `,
+    db.moment.count({
+      where: {
+        drop: {
+          collectionId: id
+        }
+      }
+    })
   ]);
+
+  // Count minted drops instead of NFTs
+  const mintedDropsCount = await db.mintedDrop.count({
+    where: {
+      drop: {
+        collectionId: id
+      }
+    }
+  });
 
   const sanitizedCollection = sanitizeCollection(collection);
 
   return {
     ...sanitizedCollection,
-    numberOfTotalMintsInCollection: Number(Array.isArray(totalMints) ? totalMints[0].count : 0),
+    numberOfTotalMintsInCollection: mintedDropsCount,
     numberOfDropsInCollection: dropsCount,
     numberOfMomentsInCollection: momentsCount,
   };
@@ -115,21 +117,30 @@ export async function getCollections(creatorId?: string, page = 1, limit = 10) {
 
   const collectionsWithMintCounts = await Promise.all(
     collections.map(async (collection) => {
-      const totalMints = await db.$queryRaw`
-        SELECT COUNT(*) as count
-        FROM "NFT"
-        WHERE "dropId" IN (
-          SELECT id FROM "Drop" WHERE "collectionId" = ${collection.id}
-        )
-      `;
+      // Count minted drops instead of NFTs
+      const mintedDropsCount = await db.mintedDrop.count({
+        where: {
+          drop: {
+            collectionId: collection.id
+          }
+        }
+      });
+
+      const momentsCount = await db.moment.count({
+        where: {
+          drop: {
+            collectionId: collection.id
+          }
+        }
+      });
 
       const sanitizedCollection = sanitizeCollection(collection);
 
       return {
         ...sanitizedCollection,
-        numberOfTotalMintsInCollection: Number(Array.isArray(totalMints) ? totalMints[0].count : 0),
+        numberOfTotalMintsInCollection: mintedDropsCount,
         numberOfDropsInCollection: collection._count?.drops || 0,
-        numberOfMomentsInCollection: 0,
+        numberOfMomentsInCollection: momentsCount,
       };
     })
   );

@@ -20,6 +20,7 @@ const navigationLinks: readonly NavigationLink[] = [
   { name: "Gallery", link: "/gallery", protected: false },
   { name: "Collections", link: "/collections", protected: false },
   { name: "Buy Credits", link: "/buy-credits", protected: true },
+  { name: "Profile", link: "/profile", protected: true },
   { name: "About", link: "/about", protected: false },
 ] as const;
 
@@ -33,7 +34,7 @@ const Navbar: React.FC = () => {
 };
 
 function UserSection() {
-  const { isAuthenticated } = useAuthStatus();
+  const { isAuthenticated, userName } = useAuthStatus();
 
   if (!isAuthenticated) {
     return <LoginButton />;
@@ -41,6 +42,13 @@ function UserSection() {
 
   return (
     <div className="flex items-center gap-3">
+      <Link 
+        href="/profile"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600 hover:bg-gray-200"
+        aria-label="View profile"
+      >
+        {userName?.charAt(0) || "U"}
+      </Link>
       <LogoutButton />
     </div>
   );

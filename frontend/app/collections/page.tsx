@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GridWrapper } from "../components/ui/grid-wrapper";
 import { AnimatedText } from "../components/ui/animated-text";
 import { useAuthStatus } from "../lib/hooks/use-auth-status";
@@ -10,9 +10,13 @@ import { CollectionsTabs } from "../components/collections/collections-tabs";
 import { CollectionsContainer } from "../components/collections/collections-container";
 import { CollectionsGrid } from "../components/collections/collections-grid";
 import { useCollectionsStore } from "../lib/hooks/use-collections-store";
+import { getCollections } from "../lib/services/collection.service";
+import { LoaderCircle } from "lucide-react";
 
 export default function CollectionsPage() {
-  const { isAuthenticated } = useAuthStatus();
+  const { isAuthenticated, userDID } = useAuthStatus();
+  const [myCollections, setMyCollections] = useState([]);
+  const [loadingMyCollections, setLoadingMyCollections] = useState(false);
 
   // Get state and actions from the collections store
   const {
@@ -20,11 +24,66 @@ export default function CollectionsPage() {
     activeTab,
     isLoading,
     collections,
+    setCollections,
     setSearchTerm,
     setActiveTab,
     setLoading,
     getCollectionsByTab,
   } = useCollectionsStore();
+
+  // Fetch collections from the API
+  useEffect(() => {
+    async function fetchCollections() {
+      try {
+        setLoading(true);
+        const response = await getCollections();
+        
+        if (response && response.collections) {
+          // Filter out default collections
+          const filteredCollections = response.collections.filter(collection => 
+            collection.name !== "Default Collection" && 
+            collection.id !== "default" &&
+            !collection.name?.toLowerCase().includes("default")
+          );
+          setCollections(filteredCollections);
+        }
+      } catch (error) {
+        console.error("Error fetching collections:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCollections();
+  }, [setCollections, setLoading]);
+
+  // Fetch user's collections if authenticated
+  useEffect(() => {
+    if (isAuthenticated && userDID) {
+      async function fetchMyCollections() {
+        try {
+          setLoadingMyCollections(true);
+          const response = await getCollections({ creatorId: userDID });
+          
+          if (response && response.collections) {
+            // Filter out default collections
+            const filteredCollections = response.collections.filter(collection => 
+              collection.name !== "Default Collection" && 
+              collection.id !== "default" &&
+              !collection.name?.toLowerCase().includes("default")
+            );
+            setMyCollections(filteredCollections);
+          }
+        } catch (error) {
+          console.error("Error fetching user collections:", error);
+        } finally {
+          setLoadingMyCollections(false);
+        }
+      }
+
+      fetchMyCollections();
+    }
+  }, [isAuthenticated, userDID]);
 
   // Simulating API loading when search input changes
   useEffect(() => {
@@ -51,10 +110,6 @@ export default function CollectionsPage() {
                   text="Create Collection"
                   href="/create-collection"
                 />
-                {/* <GrayButton
-                  text="Manage Collections"
-                  href="/manage-collection"
-                /> */}
               </div>
             )}
 
@@ -72,10 +127,6 @@ export default function CollectionsPage() {
                   text="Create Collection"
                   href="/create-collection"
                 />
-                {/* <GrayButton
-                  text="Manage Collections"
-                  href="/manage-collection"
-                /> */}
               </div>
             )}
 
@@ -111,6 +162,40 @@ export default function CollectionsPage() {
           </div>
         </GridWrapper>
       </section>
+
+      {/* My Collections Section */}
+      {isAuthenticated && (
+        <section>
+          <GridWrapper>
+            <div className="relative text-balance px-6 py-8 md:px-10">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-garamond italic font-medium">My Collections</h2>
+                <GrayButton text="Manage Collections" href="/collections/manage" />
+              </div>
+
+              {loadingMyCollections ? (
+                <div className="flex justify-center py-16">
+                  <LoaderCircle className="h-8 w-8 animate-spin text-orange-500" />
+                </div>
+              ) : myCollections.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  {myCollections.map((collection: any) => (
+                    <CollectionsGrid.Item
+                      key={collection.id}
+                      collection={collection}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <p className="text-lg text-text-secondary mb-4">You haven&apos;t created any collections yet</p>
+                  <GrayButton text="Create Collection" href="/create-collection" />
+                </div>
+              )}
+            </div>
+          </GridWrapper>
+        </section>
+      )}
     </div>
   );
 }

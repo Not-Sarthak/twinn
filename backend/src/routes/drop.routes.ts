@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { createDrop, getDrops, getDropById, updateDrop, getDropMints, getDropMoments } from '../services/drop.service';
+import { createDrop, getDrops, getDropById, updateDrop, getDropMints, getDropMoments, mintDrop } from '../services/drop.service';
 import { authenticate, requireAuth, requireOwnership } from '../utils/auth';
 import { IDropCreate, IMomentCreate } from '../types';
 import { momentService } from '../services/moment.service';
@@ -211,6 +211,51 @@ export const registerDropRoutes = (fastify: FastifyInstance, prefix: string = '/
         }
         
         return reply.code(500).send({ error: 'Error deleting moment' });
+      }
+    })
+  );
+
+  // Mint a Drop
+  fastify.post<{
+    Params: { id: string }
+  }>(
+    `${prefix}/:id/mint`, 
+    { preHandler: [authenticate] },
+    requireAuth(async (request, reply, userId) => {
+      try {
+        const { id: dropId } = request.params;
+        
+        // Check if drop exists
+        const drop = await getDropById(dropId);
+        if (!drop) {
+          return reply.code(404).send({ error: 'Drop not found' });
+        }
+        
+        // Mint the drop
+        const mintedDrop = await mintDrop({ dropId }, userId);
+        
+        return reply.code(201).send({ 
+          success: true, 
+          mintedDrop,
+          message: 'Drop minted successfully',
+          transactionHash: mintedDrop.transactionHash || null
+        });
+      } catch (error) {
+        request.log.error(error);
+        
+        if (error instanceof Error) {
+          if (error.message.includes('not found')) {
+            return reply.code(404).send({ error: error.message });
+          }
+          if (error.message.includes('ended') || error.message.includes('supply')) {
+            return reply.code(400).send({ error: error.message });
+          }
+          if (error.message.includes('credit')) {
+            return reply.code(402).send({ error: error.message });
+          }
+        }
+        
+        return reply.code(500).send({ error: 'Error minting drop' });
       }
     })
   );

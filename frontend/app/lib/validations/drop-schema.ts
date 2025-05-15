@@ -28,6 +28,10 @@ export const dropFormSchema = z.object({
     )
     .optional(),
 
+  locationType: z.enum(["virtual", "in-person"]).default("virtual"),
+  
+  location: z.string().max(100, { message: "Location cannot exceed 100 characters" }).optional(),
+
   dateRange: z
     .object({
       from: z.date(),
@@ -83,6 +87,11 @@ export const dropFormSchema = z.object({
     .optional(),
 
   createNFT: z.boolean().default(false),
+  
+  // Additional fields
+  artistInfo: z.string().max(100).optional(),
+  power: z.number().min(0).optional(),
+  collectionId: z.string().optional(),
 });
 
 export type DropFormValues = z.infer<typeof dropFormSchema>;

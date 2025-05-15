@@ -11,7 +11,7 @@ import {
   mapUserToResponse,
 } from "../services/user.service";
 import { authenticate, requireAuth } from "../utils/auth";
-import { IUserCreate, IPrivyAuth, IUserResponse } from "../types";
+import { IUserCreate, IPrivyAuth } from "../types";
 
 export const registerUserRoutes = (
   fastify: FastifyInstance,
@@ -26,7 +26,9 @@ export const registerUserRoutes = (
       
       let user = await getUserById(privyDID);
       if (user) {
-        return reply.code(409).send({ error: "User already exists" });
+        // User exists, return the user data
+        const userResponse = await mapUserToResponse(user);
+        return reply.code(200).send({ user: userResponse });
       }
       
       const existingUserByWallet = await getUserByWallet(walletAddress);
@@ -150,7 +152,6 @@ export const registerUserRoutes = (
       const publicUserInfo = {
         id: user.id,
         name: user.name,
-        profileImage: user.profileImage,
         linkedWallet: user.walletAddress,
         numberOfCollectionsCreated: user.numberOfCollectionsCreated,
         numberOfDropsCreated: user.numberOfDropsCreated,
