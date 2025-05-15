@@ -5,9 +5,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "bun src/index.ts",
+    "start": "node dist/index.js",
     "dev": "bun --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target node",
+    "build": "bun build src/index.ts --outdir dist --target node && bunx prisma generate",
     "generate": "bunx prisma generate",
     "db:migrate": "bunx prisma migrate dev",
     "db:reset": "bunx prisma migrate reset --force",
