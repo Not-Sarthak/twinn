@@ -35,7 +35,7 @@ export default function ProfilePage() {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("https://twinn-h59i.onrender.com/api/users/me", {
+        const response = await axios.get("http://localhost:3000/api/users/me", {
           headers: {
             Authorization: `Bearer ${userDID}`
           }

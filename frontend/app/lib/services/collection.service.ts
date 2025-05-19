@@ -2,7 +2,7 @@
 
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://twinn-h59i.onrender.com/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
 /**
  * Get authentication headers using the user's DID token
